@@ -2,6 +2,7 @@ package main
 import(
     "fmt"
     "net"
+    "strings"
 )
 
 var(
@@ -29,8 +30,9 @@ func main(){
 func sender(ch chan int, conn *net.UDPConn, addr *net.UDPAddr){
     var words string
     for{
-        fmt.Print("\n<- ")
+        fmt.Print("<- ")
         fmt.Scanf("%s", &words)
+        fmt.Print("\r")
         message := fmt.Sprintf("%s: %s", name, words)
         buffer := make([]byte, 512)
         copy(buffer, []byte(message))
@@ -45,7 +47,13 @@ func receiver(ch chan int, conn *net.UDPConn) {
         b:= make([]byte, 256)
         _, _, err := conn.ReadFromUDP(b)
         check(err)
-        fmt.Println("-> ", string(b))
+        msg := string(b)
+        from := strings.Split(msg, ":")[0]
+        if from == name{
+            continue
+        }
+        fmt.Println("\r->", msg)
+        fmt.Print("<- ")
     }
     ch<-1
 }
