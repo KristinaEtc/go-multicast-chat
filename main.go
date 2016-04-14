@@ -26,10 +26,11 @@ type connStr struct {
 }
 
 const (
-	commGetNicks  string = "GET_USERNAME"
-	commMsg       string = "MSG"
-	commMyNick    string = "MY_NICK"
-	commNickExist string = "NICK_EXIST"
+	commGetNicks   string = "GET_USERNAME"
+	commMsg        string = "MSG"
+	commMyNick     string = "MY_NICK"
+	commNickExist  string = "NICK_EXIST"
+	commChangeNick string = "CHANGE_NICK"
 	//commLeave     string = "LEAVED"
 	// commChangeNick string = "/NICK"
 	//private string = "PRIVATE"
@@ -112,12 +113,22 @@ func sender(ch chan int, conn *net.UDPConn, addr *net.UDPAddr) {
 		words = ""
 		fmt.Print("<- ")
 	}*/
+
+	//распределенный консенсунс
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
-		message := fmt.Sprintf("%s:%s: %s", commMsg, name, scanner.Text())
+		msg := fmt.Sprintf("%s:%s: %s", commMsg, name, scanner.Text())
 		fmt.Print("\r")
-		buffer := make([]byte, len(message))
-		copy(buffer, []byte(message))
+
+		var msgParted []string
+		msgParted = strings.Split(msg, " ")
+		if _, command := msgParted[0]; command {
+			if command == commChangeNick {
+				msg = commChangeNick + msgParted[1]
+			}
+		}
+		buffer := make([]byte, len(msg))
+		copy(buffer, []byte(msg))
 		_, err := conn.WriteToUDP(buffer, addr)
 		check(err)
 		fmt.Print("<- ")
