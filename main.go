@@ -30,7 +30,8 @@ const (
 	commMsg        string = "MSG"
 	commMyNick     string = "MY_NICK"
 	commNickExist  string = "NICK_EXIST"
-	commChangeNick string = "CHANGE_NICK"
+	commChangeNick string = "/nick"
+	tagNewName     string = "*new"
 	//commLeave     string = "LEAVED"
 	// commChangeNick string = "/NICK"
 	//private string = "PRIVATE"
@@ -83,11 +84,7 @@ func main() {
 	connection.localConn, err = net.ListenUDP("udp", connection.localAddress)
 	check(err)
 
-	//fmt.Println(connection.localConn.LocalAddr())
-
-	//check(err)
-	message := fmt.Sprintf("%s:%s", commMyNick, name)
-	//fmt.Println("ip ", message)
+	message := fmt.Sprintf("%s:%s:%s", commMyNick, tagNewName, name)
 	buffer := make([]byte, len(message))
 	copy(buffer, []byte(message))
 	_, err = connection.localConn.WriteToUDP(buffer, connection.mcastAddress)
@@ -100,32 +97,26 @@ func main() {
 }
 
 func sender(ch chan int, conn *net.UDPConn, addr *net.UDPAddr) {
-	//var words string
-	/*for {
-		//fmt.Print("<- ")
-		fmt.Scanf("%s", &words)
-		fmt.Print("\r")
-		message := fmt.Sprintf("%s:%s: %s", commMsg, name, words)
-		buffer := make([]byte, len(message))
-		copy(buffer, []byte(message))
-		_, err := conn.WriteToUDP(buffer, addr)
-		check(err)
-		words = ""
-		fmt.Print("<- ")
-	}*/
 
 	//распределенный консенсунс
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
-		msg := fmt.Sprintf("%s:%s: %s", commMsg, name, scanner.Text())
+		msg := fmt.Sprintf("%s", scanner.Text())
 		fmt.Print("\r")
 
 		var msgParted []string
 		msgParted = strings.Split(msg, " ")
-		if _, command := msgParted[0]; command {
-			if command == commChangeNick {
-				msg = commChangeNick + msgParted[1]
+		command := msgParted[0]
+		if command == commChangeNick {
+			if len(msgParted) < 2 || msgParted[1] == name {
+				continue
 			}
+			msg = commMyNick + ":" + name + ":" + msgParted[1]
+			name = msgParted[1]
+
+		} else {
+			msg = commMsg + ":" + name + ":" + msg
+			//fmt.Printf("%s\n", msg)
 		}
 		buffer := make([]byte, len(msg))
 		copy(buffer, []byte(msg))
@@ -154,7 +145,7 @@ func receiver(ch chan int, conn *net.UDPConn) {
 		}
 
 		//if msg[0] != commMsg && msg[0] != commMyNick {
-		//	fmt.Println("rawMsg ", rawMsg)
+
 		//}
 
 		switch msg[0] { //check command type
@@ -169,28 +160,34 @@ func receiver(ch chan int, conn *net.UDPConn) {
 			}
 		case commMyNick:
 			{
-				fmt.Printf("\r*** %s has joined to chat ***\n", msg[1])
+				//fmt.Println("\rrawMsg ", rawMsg)
 				fmt.Print("<- ")
-
-				i := strings.Compare(addr.String(), connection.localConn.LocalAddr().String())
 
 				//fmt.Printf("- %d %v %v %v %v\n", i, len(msg[1]), len(name), msg[1] == name, i != 0)
 
-				if (msg[1] == name) && (i != 0) {
-					fmt.Println("i have a nick and he is mine")
+				i := strings.Compare(addr.String(), connection.localConn.LocalAddr().String())
+				if i != 0 {
+					if msg[2] == name { //names from different ip adds are equal!
+						//fmt.Println("i have a nick and he is mine")
 
-					//destAddress, err := net.ResolveUDPAddr("udp", addr.String())
-					//check(err)
+						message := fmt.Sprintf("%s:%s", commNickExist, name)
+						//s fmt.Println(messa)
+						buffer := make([]byte, len(message))
+						copy(buffer, []byte(message))
 
-					message := fmt.Sprintf("%s:%s", commNickExist, name)
-					//s fmt.Println(messa)
-					buffer := make([]byte, len(message))
-					copy(buffer, []byte(message))
-
-					//_, err = connection.localConn.WriteToUDP(buffer, addr)
-					_, err = connection.localConn.WriteToUDP(buffer, connection.mcastAddress)
-					check(err)
-					//break
+						//_, err = connection.localConn.WriteToUDP(buffer, addr)
+						_, err = connection.localConn.WriteToUDP(buffer, connection.mcastAddress)
+						check(err)
+						//break
+					} else if msg[1] == "*new" {
+						fmt.Printf("\r*** %s has joined to chat ***\n", msg[2])
+					} else {
+						fmt.Printf("\r***%s changed name to %s***\n", msg[1], msg[2])
+					}
+				} else {
+					if len(msg) > 2 && msg[1] != tagNewName {
+						fmt.Printf("\r*** You changed name to %s ***\n", msg[2])
+					}
 				}
 				fmt.Print("\r<- ")
 				//break
@@ -199,17 +196,18 @@ func receiver(ch chan int, conn *net.UDPConn) {
 			{
 
 				i := strings.Compare(addr.String(), connection.localConn.LocalAddr().String())
-				if msg[1] == name && (i != 0) {
+				if msg[1] == name && (i != 0) { //nick is the same, ip addr is not
 					//fmt.Print("commLineExists\n")
 
 					newName := "User" + strconv.Itoa(myRand.Intn(1000))
 					fmt.Printf("\r*** Nick %s already exists. Changing to %s ***\n", name, newName)
-					fmt.Printf("*** To change nick type '/nick NEW_NICKNAME' ***\n")
+					fmt.Printf("*** To change nick type '%s NEW_NICKNAME' ***\n", commChangeNick)
 					fmt.Print("<- ")
 
 					//check(err)
+
+					message := fmt.Sprintf("%s:%s:%s", commMyNick, name, newName)
 					name = newName
-					message := fmt.Sprintf("%s:%s", commMyNick, name)
 					//fmt.Println("ip ", message)
 					buffer := make([]byte, len(message))
 					copy(buffer, []byte(message))
