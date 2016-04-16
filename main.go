@@ -36,6 +36,11 @@ const (
 )
 
 const (
+	usagePrivate    string = "'/private' command usage: " + userCommPrivate + " NICK MESSAGE"
+	usageChangeNick string = "To change nick type '" + userCommChangeNick + " NEW_NICKNAME'"
+)
+
+const (
 	tagNewName string = "*new"
 )
 
@@ -68,6 +73,13 @@ func getMyIP() (string, error) {
 
 var connection = connStr{}
 var myRand *rand.Rand
+
+func usage() {
+	fmt.Println("****************************************")
+	fmt.Println(usagePrivate)
+	fmt.Println(usageChangeNick)
+	fmt.Println("****************************************")
+}
 
 func main() {
 
@@ -127,13 +139,15 @@ func sender(ch chan int, conn *net.UDPConn, addr *net.UDPAddr) {
 		case userCommPrivate:
 			{
 				if len(msgParted) < 3 {
-					fmt.Printf("\rSYSTEM: '/private' command usage: %s NICK MESSAGE\n", userCommPrivate)
+					//fmt.Printf("\rSYSTEM: '/private' command usage: %s NICK MESSAGE\n", userCommPrivate)
+					fmt.Printf("\r%s\n", usagePrivate)
 					fmt.Print("<- ")
 					continue
 				}
-				rowMsg := msg[(len(commPrivate) + len(msgParted[1]) + 2):]
-				msg = commPrivate + ":" + msgParted[1] + ":" + rowMsg
-				fmt.Println(msg, " ", len(msg))
+				rowMsg := msg[(len(commPrivate) + len(msgParted[1]) + 3):]
+				msg = commPrivate + ":" + msgParted[1] + ":" + name + ": " + rowMsg
+				//fmt.Println("row private mes:",rowMsg, "/len: ", len(rowMsg))
+				//fmt.Println(msg)
 			}
 		default:
 			{
@@ -211,6 +225,9 @@ func receiver(ch chan int, conn *net.UDPConn) {
 
 				if msg[1] == tagNewName {
 					fmt.Printf("\r*** %s has joined to chat ***\n", who)
+					if i == 0 {
+						usage()
+					}
 				} else {
 					if i == 0 {
 						fmt.Printf("\r*** %s changed name to %s ***\n", who, msg[2])
@@ -231,7 +248,7 @@ func receiver(ch chan int, conn *net.UDPConn) {
 
 					newName := "User" + strconv.Itoa(myRand.Intn(1000))
 					fmt.Printf("\rSYSTEM: Nick %s already exists. Changing to %s\n", name, newName)
-					fmt.Printf("SYSTEM: To change nick type '%s NEW_NICKNAME'\n", userCommChangeNick)
+					fmt.Printf("SYSTEM: %s\n", usageChangeNick)
 					fmt.Print("<- ")
 
 					//check(err)
@@ -247,6 +264,17 @@ func receiver(ch chan int, conn *net.UDPConn) {
 					//break
 				}
 
+			}
+		case commPrivate:
+			{
+				i := strings.Compare(addr.String(), connection.localConn.LocalAddr().String())
+				if i != 0 {
+					if len(msg) > 2 && msg[1] == name {
+						rawMsg = rawMsg[len(msg[0])+len(msg[1])+2:]
+						fmt.Printf("\r->[%s] %s\n", msg[0], rawMsg)
+						fmt.Print("<- ")
+					}
+				}
 			}
 		default:
 			{
