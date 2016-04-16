@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	//"log"
 	"math/rand"
 	"net"
 	"os"
@@ -15,7 +16,8 @@ var (
 	name      string
 	chsender  chan int
 	chreciver chan int
-	userNames []string
+	userNames = make(map[string]time.Time)
+	//userNames []string
 )
 
 type connStr struct {
@@ -33,11 +35,13 @@ const (
 	//commLeave     string = "LEAVED"
 	// commChangeNick string = "/NICK"
 	commPrivate string = "PRIVATE"
+	commExit    string = "QUIT"
 )
 
 const (
 	usagePrivate    string = "'/private' command usage: " + userCommPrivate + " NICK MESSAGE"
 	usageChangeNick string = "To change nick type '" + userCommChangeNick + " NEW_NICKNAME'"
+	usageExit       string = "To exit type '" + userCommExit + "'"
 )
 
 const (
@@ -47,6 +51,8 @@ const (
 const (
 	userCommChangeNick string = "/nick"
 	userCommPrivate    string = "/private"
+	userCommExit       string = "/quit"
+	//userCommgetUsers    string = "/users"
 )
 
 //func getMyIP() (addr [4]byte, err error) {
@@ -78,6 +84,7 @@ func usage() {
 	fmt.Println("****************************************")
 	fmt.Println(usagePrivate)
 	fmt.Println(usageChangeNick)
+	fmt.Println(usageExit)
 	fmt.Println("****************************************")
 }
 
@@ -111,9 +118,16 @@ func main() {
 
 	go sender(chsender, connection.localConn, connection.mcastAddress)
 	go receiver(chreciver, connection.mcastConn)
+	//go sendPing(chreciver, connection.mcastConn)
 	<-chsender
 	<-chreciver
 }
+
+/*func sendPing(){
+	for{
+
+	}
+}*/
 
 func sender(ch chan int, conn *net.UDPConn, addr *net.UDPAddr) {
 
@@ -149,6 +163,17 @@ func sender(ch chan int, conn *net.UDPConn, addr *net.UDPAddr) {
 				//fmt.Println("row private mes:",rowMsg, "/len: ", len(rowMsg))
 				//fmt.Println(msg)
 			}
+		case userCommExit:
+			{
+				msg = commExit + ":" + name
+				fmt.Println("*** Bye ***")
+				//ch <- 1
+				buffer := make([]byte, len(msg))
+				copy(buffer, []byte(msg))
+				_, err := conn.WriteToUDP(buffer, addr)
+				check(err)
+				os.Exit(0)
+			}
 		default:
 			{
 				msg = commMsg + ":" + name + ":" + msg
@@ -162,8 +187,8 @@ func sender(ch chan int, conn *net.UDPConn, addr *net.UDPAddr) {
 		check(err)
 		fmt.Print("<- ")
 	}
-	fmt.Print("quit")
-	ch <- 1
+	fmt.Print("you should never see this message\n")
+	//ch <- 1
 }
 
 func receiver(ch chan int, conn *net.UDPConn) {
@@ -218,6 +243,8 @@ func receiver(ch chan int, conn *net.UDPConn) {
 						_, err = connection.localConn.WriteToUDP(buffer, connection.mcastAddress)
 						check(err)
 						//break
+					} else { //nick is ok, adding it to userNicks
+						userNames[msg[2]] = time.Now()
 					}
 				} else {
 					who = "You"
@@ -226,6 +253,7 @@ func receiver(ch chan int, conn *net.UDPConn) {
 				if msg[1] == tagNewName {
 					fmt.Printf("\r*** %s has joined to chat ***\n", who)
 					if i == 0 {
+						userNames[name] = time.Now()
 						usage()
 					}
 				} else {
@@ -275,6 +303,12 @@ func receiver(ch chan int, conn *net.UDPConn) {
 						fmt.Print("<- ")
 					}
 				}
+			}
+		case commExit:
+			{
+				fmt.Printf("\r*** %s leaved the chat  ***\n", msg[1])
+				delete(userNames, msg[1])
+				fmt.Print("<- ")
 			}
 		default:
 			{
