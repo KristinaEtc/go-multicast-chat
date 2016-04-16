@@ -36,12 +36,14 @@ const (
 	// commChangeNick string = "/NICK"
 	commPrivate string = "PRIVATE"
 	commExit    string = "QUIT"
+	commPing    string = "PING"
 )
 
 const (
 	usagePrivate    string = "'/private' command usage: " + userCommPrivate + " NICK MESSAGE"
 	usageChangeNick string = "To change nick type '" + userCommChangeNick + " NEW_NICKNAME'"
 	usageExit       string = "To exit type '" + userCommExit + "'"
+	usageGetNicks   string = "To show list of users, type '" + userCommgetUsers + "'"
 )
 
 const (
@@ -85,6 +87,7 @@ func usage() {
 	fmt.Println(usagePrivate)
 	fmt.Println(usageChangeNick)
 	fmt.Println(usageExit)
+	fmt.Println(usageGetNicks)
 	fmt.Println("****************************************")
 }
 
@@ -118,16 +121,34 @@ func main() {
 
 	go sender(chsender, connection.localConn, connection.mcastAddress)
 	go receiver(chreciver, connection.mcastConn)
-	//go sendPing(chreciver, connection.mcastConn)
+	go sendGetPing(chsender, connection.localConn, connection.mcastAddress)
 	<-chsender
 	<-chreciver
 }
 
-/*func sendPing(){
-	for{
+func sendGetPing(ch chan int, conn *net.UDPConn, addr *net.UDPAddr) {
+	for {
 
+		timer := time.NewTimer(time.Second * 5)
+		<-timer.C
+
+		msg := commPing + ":" + name
+
+		buffer := make([]byte, len(msg))
+		copy(buffer, []byte(msg))
+		_, err := conn.WriteToUDP(buffer, addr)
+		check(err)
+
+		for user, lastPing := range userNames {
+			diff := time.Now().Sub(lastPing)
+			if diff.Seconds() > 5 && user != name {
+				fmt.Printf("\r*** %s leaved the chat  ***\n", user)
+				delete(userNames, user)
+				fmt.Print("<- ")
+			}
+		}
 	}
-}*/
+}
 
 func sender(ch chan int, conn *net.UDPConn, addr *net.UDPAddr) {
 
@@ -179,7 +200,7 @@ func sender(ch chan int, conn *net.UDPConn, addr *net.UDPAddr) {
 				fmt.Println("\rUsers:")
 				for user, lastPing := range userNames {
 					diff := time.Now().Sub(lastPing)
-					if diff.Seconds() < 59 {
+					if diff.Seconds() < 5 {
 						fmt.Print(user, "\t")
 					} else {
 						fmt.Println(diff.Seconds())
@@ -262,6 +283,7 @@ func receiver(ch chan int, conn *net.UDPConn) {
 						//break
 					} else { //nick is ok, adding it to userNicks
 						//fmt.Println("jj")
+						delete(userNames, msg[1])
 						userNames[msg[2]] = time.Now()
 					}
 				} else {
@@ -328,6 +350,10 @@ func receiver(ch chan int, conn *net.UDPConn) {
 				fmt.Printf("\r*** %s leaved the chat  ***\n", msg[1])
 				delete(userNames, msg[1])
 				fmt.Print("<- ")
+			}
+		case commPing:
+			{
+				userNames[msg[1]] = time.Now()
 			}
 		default:
 			{
