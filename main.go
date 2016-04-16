@@ -212,6 +212,12 @@ func sender(ch chan int, conn *net.UDPConn, addr *net.UDPAddr) {
 			}
 		default: //just message
 			{
+				//fmt.Println(msg[:1])
+				if msg[:1] == "/" {
+					fmt.Println("\rCommand not found =/")
+					fmt.Print("<- ")
+					continue
+				}
 				msg = commMsg + ":" + name + ":" + msg
 				//fmt.Printf("%s\n", msg)
 			}
@@ -223,7 +229,8 @@ func sender(ch chan int, conn *net.UDPConn, addr *net.UDPAddr) {
 		check(err)
 		fmt.Print("<- ")
 	}
-	fmt.Print("you should never see this message\n")
+	//fmt.Print("Cntl-D for exit. Bye\n")
+	os.Exit(0)
 	//ch <- 1
 }
 
@@ -283,9 +290,9 @@ func receiver(ch chan int, conn *net.UDPConn) {
 						//break
 					} else { //nick is ok, adding it to userNicks
 						//fmt.Println("jj")
-						delete(userNames, msg[1])
 						userNames[msg[2]] = time.Now()
 					}
+					delete(userNames, msg[1])
 				} else {
 					who = "You"
 					userNames[name] = time.Now()
@@ -310,11 +317,10 @@ func receiver(ch chan int, conn *net.UDPConn) {
 			}
 		case commNickExist:
 			{
-
 				i := strings.Compare(addr.String(), connection.localConn.LocalAddr().String())
 				if msg[1] == name && (i != 0) { //nick is the same, ip addr is not
 					//fmt.Print("commLineExists\n")
-
+					delete(userNames, name)
 					newName := "User" + strconv.Itoa(myRand.Intn(1000))
 					fmt.Printf("\rSYSTEM: Nick %s already exists. Changing to %s\n", name, newName)
 					fmt.Printf("SYSTEM: %s\n", usageChangeNick)
@@ -323,6 +329,7 @@ func receiver(ch chan int, conn *net.UDPConn) {
 					//check(err)
 
 					message := fmt.Sprintf("%s:%s:%s", commMyNick, name, newName)
+
 					name = newName
 					//fmt.Println("ip ", message)
 					buffer := make([]byte, len(message))
@@ -332,7 +339,6 @@ func receiver(ch chan int, conn *net.UDPConn) {
 
 					//break
 				}
-
 			}
 		case commPrivate:
 			{
@@ -361,7 +367,6 @@ func receiver(ch chan int, conn *net.UDPConn) {
 				//continue
 			}
 		}
-
 	}
 	ch <- 1
 }
