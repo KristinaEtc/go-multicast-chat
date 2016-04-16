@@ -26,15 +26,22 @@ type connStr struct {
 }
 
 const (
-	commGetNicks   string = "GET_USERNAME"
-	commMsg        string = "MSG"
-	commMyNick     string = "MY_NICK"
-	commNickExist  string = "NICK_EXIST"
-	commChangeNick string = "/nick"
-	tagNewName     string = "*new"
+	commGetNicks  string = "GET_USERNAME"
+	commMsg       string = "MSG"
+	commMyNick    string = "MY_NICK"
+	commNickExist string = "NICK_EXIST"
 	//commLeave     string = "LEAVED"
 	// commChangeNick string = "/NICK"
-	//private string = "PRIVATE"
+	commPrivate string = "PRIVATE"
+)
+
+const (
+	tagNewName string = "*new"
+)
+
+const (
+	userCommChangeNick string = "/nick"
+	userCommPrivate    string = "/private"
 )
 
 //func getMyIP() (addr [4]byte, err error) {
@@ -107,17 +114,34 @@ func sender(ch chan int, conn *net.UDPConn, addr *net.UDPAddr) {
 		var msgParted []string
 		msgParted = strings.Split(msg, " ")
 		command := msgParted[0]
-		if command == commChangeNick {
-			if len(msgParted) < 2 || msgParted[1] == name {
-				continue
-			}
-			msg = commMyNick + ":" + name + ":" + msgParted[1]
-			name = msgParted[1]
+		switch command {
+		case userCommChangeNick:
+			{
+				if len(msgParted) < 2 || msgParted[1] == name {
+					continue
+				}
+				msg = commMyNick + ":" + name + ":" + msgParted[1]
+				name = msgParted[1]
 
-		} else {
-			msg = commMsg + ":" + name + ":" + msg
-			//fmt.Printf("%s\n", msg)
+			}
+		case userCommPrivate:
+			{
+				if len(msgParted) < 3 {
+					fmt.Printf("\rSYSTEM: '/private' command usage: %s NICK MESSAGE\n", userCommPrivate)
+					fmt.Print("<- ")
+					continue
+				}
+				rowMsg := msg[(len(commPrivate) + len(msgParted[1]) + 2):]
+				msg = commPrivate + ":" + msgParted[1] + ":" + rowMsg
+				fmt.Println(msg, " ", len(msg))
+			}
+		default:
+			{
+				msg = commMsg + ":" + name + ":" + msg
+				//fmt.Printf("%s\n", msg)
+			}
 		}
+
 		buffer := make([]byte, len(msg))
 		copy(buffer, []byte(msg))
 		_, err := conn.WriteToUDP(buffer, addr)
@@ -145,7 +169,6 @@ func receiver(ch chan int, conn *net.UDPConn) {
 		}
 
 		//if msg[0] != commMsg && msg[0] != commMyNick {
-
 		//}
 
 		switch msg[0] { //check command type
@@ -165,8 +188,10 @@ func receiver(ch chan int, conn *net.UDPConn) {
 
 				//fmt.Printf("- %d %v %v %v %v\n", i, len(msg[1]), len(name), msg[1] == name, i != 0)
 
+				var who string
 				i := strings.Compare(addr.String(), connection.localConn.LocalAddr().String())
 				if i != 0 {
+					who = msg[2]
 					if msg[2] == name { //names from different ip adds are equal!
 						//fmt.Println("i have a nick and he is mine")
 
@@ -179,16 +204,21 @@ func receiver(ch chan int, conn *net.UDPConn) {
 						_, err = connection.localConn.WriteToUDP(buffer, connection.mcastAddress)
 						check(err)
 						//break
-					} else if msg[1] == "*new" {
-						fmt.Printf("\r*** %s has joined to chat ***\n", msg[2])
-					} else {
-						fmt.Printf("\r***%s changed name to %s***\n", msg[1], msg[2])
 					}
 				} else {
-					if len(msg) > 2 && msg[1] != tagNewName {
-						fmt.Printf("\r*** You changed name to %s ***\n", msg[2])
+					who = "You"
+				}
+
+				if msg[1] == tagNewName {
+					fmt.Printf("\r*** %s has joined to chat ***\n", who)
+				} else {
+					if i == 0 {
+						fmt.Printf("\r*** %s changed name to %s ***\n", who, msg[2])
+					} else {
+						fmt.Printf("\r*** %s changed name to %s ***\n", msg[1], msg[2])
 					}
 				}
+
 				fmt.Print("\r<- ")
 				//break
 			}
@@ -200,8 +230,8 @@ func receiver(ch chan int, conn *net.UDPConn) {
 					//fmt.Print("commLineExists\n")
 
 					newName := "User" + strconv.Itoa(myRand.Intn(1000))
-					fmt.Printf("\r*** Nick %s already exists. Changing to %s ***\n", name, newName)
-					fmt.Printf("*** To change nick type '%s NEW_NICKNAME' ***\n", commChangeNick)
+					fmt.Printf("\rSYSTEM: Nick %s already exists. Changing to %s\n", name, newName)
+					fmt.Printf("SYSTEM: To change nick type '%s NEW_NICKNAME'\n", userCommChangeNick)
 					fmt.Print("<- ")
 
 					//check(err)
