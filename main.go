@@ -52,7 +52,7 @@ const (
 	userCommChangeNick string = "/nick"
 	userCommPrivate    string = "/private"
 	userCommExit       string = "/quit"
-	//userCommgetUsers    string = "/users"
+	userCommgetUsers   string = "/users"
 )
 
 //func getMyIP() (addr [4]byte, err error) {
@@ -158,8 +158,8 @@ func sender(ch chan int, conn *net.UDPConn, addr *net.UDPAddr) {
 					fmt.Print("<- ")
 					continue
 				}
-				rowMsg := msg[(len(commPrivate) + len(msgParted[1]) + 3):]
-				msg = commPrivate + ":" + msgParted[1] + ":" + name + ": " + rowMsg
+				rawMsg := msg[(len(commPrivate) + len(msgParted[1]) + 3):]
+				msg = commPrivate + ":" + msgParted[1] + ":" + name + ": " + rawMsg
 				//fmt.Println("row private mes:",rowMsg, "/len: ", len(rowMsg))
 				//fmt.Println(msg)
 			}
@@ -174,7 +174,22 @@ func sender(ch chan int, conn *net.UDPConn, addr *net.UDPAddr) {
 				check(err)
 				os.Exit(0)
 			}
-		default:
+		case userCommgetUsers:
+			{
+				fmt.Println("\rUsers:")
+				for user, lastPing := range userNames {
+					diff := time.Now().Sub(lastPing)
+					if diff.Seconds() < 59 {
+						fmt.Print(user, "\t")
+					} else {
+						fmt.Println(diff.Seconds())
+						delete(userNames, "user")
+					}
+				}
+				fmt.Print("\n<- ")
+				continue
+			}
+		default: //just message
 			{
 				msg = commMsg + ":" + name + ":" + msg
 				//fmt.Printf("%s\n", msg)
@@ -223,6 +238,8 @@ func receiver(ch chan int, conn *net.UDPConn) {
 		case commMyNick:
 			{
 				//fmt.Println("\rrawMsg ", rawMsg)
+				//fmt.Printf("\n%s/%d\n", msg[2][1:], len(msg[2]))
+				//fmt.Println("")
 				fmt.Print("<- ")
 
 				//fmt.Printf("- %d %v %v %v %v\n", i, len(msg[1]), len(name), msg[1] == name, i != 0)
@@ -244,10 +261,12 @@ func receiver(ch chan int, conn *net.UDPConn) {
 						check(err)
 						//break
 					} else { //nick is ok, adding it to userNicks
+						//fmt.Println("jj")
 						userNames[msg[2]] = time.Now()
 					}
 				} else {
 					who = "You"
+					userNames[name] = time.Now()
 				}
 
 				if msg[1] == tagNewName {
