@@ -1,7 +1,6 @@
 package main
 
 import (
-	"math/rand"
 	"net"
 	"time"
 )
@@ -19,10 +18,16 @@ type connPointers struct {
 	localConn    *net.UDPConn
 }
 
+type msgStore struct {
+	msgBody      string
+	answerStatus map[string]bool
+	userCount    int
+}
+
 type globalData struct {
-	user         *userInfo
+	user         userInfo
 	lastUserPing map[string]time.Time
-	recivedMsg   map[time.Time]string
+	sendedMsg    map[time.Time]*msgStore
 	conn         connPointers
 }
 
@@ -55,6 +60,3 @@ const (
 	userCommExit       string = "/quit"
 	userCommGetUsers   string = "/users"
 )
-
-//for generation username
-var s rand.Source = rand.NewSource(time.Now().UnixNano())
